@@ -1,0 +1,324 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Articulation Points</title>
+<link href="styles.css" rel="stylesheet">
+ 
+
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <script type="text/javascript">
+  	function getScaleFreeNetwork(nodeCount) {
+	  var nodes = [];
+	  var edges = [];
+	  var connectionCount = [];
+
+	  // create nodes
+	  for (var i = 0; i < nodeCount; i++) {
+	    nodes.push({
+	      id: i,
+	      label: String(i)
+	    });
+
+	    connectionCount[i] = 0;
+
+	    // create edges 
+	    if (i == 1) {
+	      var from = i;
+	      var to = 0;
+	      edges.push({
+	        from: from,
+	        to: to
+	      });
+
+	      adj[from].push(to);
+	      adj[to].push(from);
+	      
+	      connectionCount[from]++;
+	      connectionCount[to]++;
+	    }
+	    else if (i > 1) {
+	      var conn = edges.length * 2;
+	      var rand = Math.floor(seededRandom() * conn);
+	      var cum = 0;
+	      var j = 0;
+	      while (j < connectionCount.length && cum < rand) {
+	        cum += connectionCount[j];
+	        j++;
+	      }
+
+
+	      var from = i;
+	      var to = j;
+	      edges.push({
+	        from: from,
+	        to: to
+	      });
+
+	      adj[from].push(to);
+	      adj[to].push(from);
+
+
+	      connectionCount[from]++;
+	      connectionCount[to]++;
+	    }
+	  }
+
+	  return {nodes:nodes, edges:edges};
+	}
+
+	var randomSeed = 764; // Math.round(Math.random()*1000);
+	function seededRandom() {
+	  var x = Math.sin(randomSeed++) * 10000;
+	  return x - Math.floor(x);
+	}
+  </script>
+
+  <script type="text/javascript">
+  	var adj = null;
+    var nbrNodes = 0;
+    var network = null;
+    var data = null;
+    var seed = 2;
+    var time = 0;
+
+    // randomly create some nodes and edges
+    function drawRandom(nbr_Nodes=3){
+    	nbrNodes = nbr_Nodes;
+    	
+    	adj = null;
+    	adj = new Array(nbrNodes);
+    	for (var i = 0; i < adj.length; i++)
+    		adj[i] = new Array();
+
+    	data = getScaleFreeNetwork(nbrNodes);
+    	draw();
+    }
+
+    function destroy() {
+      if (network !== null) {
+        network.destroy();
+        network = null;
+      }
+    }
+
+    function draw() {
+      destroy();
+      // create a network
+      var container = document.getElementById('mynetwork');
+      var options = {
+        layout: {randomSeed:seed}, 
+        locale: "en",
+        manipulation: {
+          addNode: function (nodeData, callback) {
+            nodeData.label = String(nbrNodes);
+            nodeData.id = nbrNodes;
+            
+            data.nodes.push({
+					      id: nodeData.id,
+					      label: String(nodeData.id)
+					    });
+            adj.push([]);
+            
+            nbrNodes++;
+      		callback(nodeData);
+          },
+          addEdge: function (edgeData, callback) {
+            if (edgeData.from == edgeData.to) {
+              var r = confirm("Do you want to connect the node to itself?");
+              if (r != true) {
+                callback(null);
+                return;
+              }
+            }
+            if (typeof edgeData.to === 'object')
+		        edgeData.to = edgeData.to.id
+		    if (typeof edgeData.from === 'object')
+		        edgeData.from = edgeData.from.id
+		    
+		    edgeData.label = "";
+		    
+		    adj[edgeData.from].push(edgeData.to);
+	     	adj[edgeData.to].push(edgeData.from);
+
+		    data.edges.push({
+				        from: edgeData.from,
+				        to: edgeData.to,
+				        id: edgeData.id
+				      });
+
+	        callback(edgeData);
+          },
+          deleteNode : function (nodeData, callback) {
+          	if(nodeData.nodes[0]===(nbrNodes-1))
+          	{
+          		nbrNodes--;
+          		data.nodes.pop();//find connected edges edge and delete them
+          		deleteNodeEdges(nbrNodes);
+          		adj.pop();
+          		callback(nodeData);
+          	}
+          	else
+          		callback(null);
+          },
+          deleteEdge : function (edgeData, callback){
+          	var edge = network.getConnectedNodes(edgeData.edges[0]);
+          	deleteEdges(edge[0],edge[1]);
+          	callback(edgeData);
+          },
+          editEdge : false
+        }
+      };
+      network = new vis.Network(container, data, options);
+    }
+
+    function deleteNodeEdges(node)
+    {
+    	for(var i = 0; i < adj[node].length; i++)
+    	{
+    		var index = adj[adj[node][i]].findIndex(n => n == node);
+    		adj[adj[node][i]].splice(index, 1);
+    	}
+    }
+    function deleteEdges(from, to)
+    {
+    		var index = adj[from].findIndex(n => n == to);
+    		adj[from].splice(index, 1);
+    		index = adj[to].findIndex(n => n == from);
+    		adj[to].splice(index, 1);
+    }
+   
+    function init() {	  
+      drawRandom();
+    }
+
+    function start() {
+	  drawRandom(parseInt(document.getElementById("nbrNodes").value));
+	}
+
+	function APsDFS(u, visited, disc, low, parent, ap) 
+	{ 
+	  
+	    // Count of children in DFS Tree 
+	    var children = 0; 
+	  
+	    // Mark the current node as visited 
+	    visited[u] = true; 
+	  
+	    // Initialize discovery time and low value 
+	    disc[u] = low[u] = ++time; 
+	  
+	    // Go through all vertices aadjacent to this 
+	    for (var i = 0; i < adj[u].length;++i) 
+	    { 
+	        var v = adj[u][i];  // v is current adjacent of u 
+	  
+	        // If v is not visited yet, then make it a child of u 
+	        // in DFS tree and recur for it 
+	        if (!visited[v]) 
+	        { 
+	            children++; 
+	            parent[v] = u; 
+	            APsDFS(v, visited, disc, low, parent, ap); 
+	  
+	            // Check if the subtree rooted with v has a connection to 
+	            // one of the ancestors of u 
+	            low[u]  = Math.min(low[u], low[v]); 
+	  
+	            // u is an articulation point in following cases 
+	  
+	            // (1) u is root of DFS tree and has two or more chilren. 
+	            if (parent[u] == -1 && children > 1) 
+	               ap[u] = true; 
+	  
+	            // (2) If u is not root and low value of one of its child is more 
+	            // than discovery value of u. 
+	            if (parent[u] != -1 && low[v] >= disc[u]) 
+	               ap[u] = true; 
+	        } 
+	  
+	        // Update low value of u for parent function calls. 
+	        else if (v != parent[u]) 
+	            low[u]  = Math.min(low[u], disc[v]); 
+	    } 
+	} 
+	  
+	// The function to do DFS traversal. It uses recursive function APUtil() 
+	function findAPs() 
+	{
+
+	    // Mark all the vertices as not visited 
+	    var visited = new Array(nbrNodes); 
+	    var disc = new Array(nbrNodes); 
+	    var low = new Array(nbrNodes); 
+	    var parent = new Array(nbrNodes); 
+	    var ap = new Array(nbrNodes); // To store articulation points 
+	    time = 0; 
+	  
+	    // Initialize parent and visited, and ap(articulation point) arrays 
+	    for (var i = 0; i < nbrNodes; i++) 
+	    { 
+	        parent[i] = -1; 
+	        visited[i] = false; 
+	        ap[i] = false; 
+	    } 
+	  
+	    // Call the recursive APsDFS function to find articulation points 
+	    // in DFS tree rooted with vertex 'i' 
+	    for (var i = 0; i < nbrNodes; i++) 
+	        if (visited[i] == false) 
+	            APsDFS(i, visited, disc, low, parent, ap); 
+
+	  	var aps = [];
+	  	for (var i = 0; i < nbrNodes; i++) 
+        	if (ap[i] == true) 
+        	{
+        		aps.push(i);
+        		network.body.nodes[i].options.color.background = 'blueviolet';
+        	}
+        	else
+        		network.body.nodes[i].options.color.background = '#97C2FC';
+        
+        if(aps.length===0)
+        	window.alert("There are no Articulation Points.");
+        else
+        	window.alert("Articulation Points are the nodes : [ " + aps +" ]");
+
+	  	network.redraw();
+	} 
+
+
+
+
+
+	function areAdjacent(from, to)
+	{
+		if(adj[from].findIndex(n => n == to) == -1)
+			return false;
+		return true;
+	}
+
+  </script>
+  
+</head>
+ 
+<body onload="init();">
+    <header>
+        TP2 : Articulation point in an unoriented graph
+     </header>
+     <div class="container">
+        <div id="mynetwork" class="graph"></div>
+        <div  id="control" class="panel">
+            
+                <div class="input"><label> Number of nodes  </label><input type="number" id="nbrNodes" min="1" max="50" value="5"></div>
+                <div class="btn"><button onclick="start()" >Draw</button></div>
+                <div class="btn"><span><button onclick="findAPs()" >Find articulation points</button></span></div>
+            
+        </div>
+     </div>
+
+	
+	
+
+</body>
+</html>
